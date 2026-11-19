@@ -70,6 +70,18 @@ canvas {
     box-shadow: 0 0 10px rgba(0,0,0,0.3);
 }
 
+#sound-toggle {
+    display: block;
+    width: 100%;
+    padding: 10px;
+    margin-top: 15px;
+    border: 1px solid #999;
+    border-radius: 5px;
+    cursor: pointer;
+    background: #eee;
+    font-size: 13px;
+}
+
 #status-text {
     margin-top: 10px;
     font-size: 14px;
@@ -86,6 +98,7 @@ canvas {
         <h2>Mossy Rock</h2>
         <button id="sunny-btn" class="weather-btn sunny-btn active-weather">Sunny</button>
         <button id="rainy-btn" class="weather-btn rainy-btn">Rainy</button>
+        <button id="sound-toggle">Sound: On</button>
         <div id="status-text">Click to plant moss!</div>
     </div>
     <canvas id="mossCanvas"></canvas>
@@ -96,10 +109,12 @@ canvas {
     const ctx = canvas.getContext('2d');
     const sunnyBtn = document.getElementById('sunny-btn');
     const rainyBtn = document.getElementById('rainy-btn');
+    const soundToggle = document.getElementById('sound-toggle');
     const statusText = document.getElementById('status-text');
 
     let weather = 'sunny';
     let mossPatches = [];
+    let soundEnabled = true;
 
     // Audio Context for rain sound
     let audioCtx = null;
@@ -137,7 +152,7 @@ canvas {
     }
 
     function playTapSound(type) {
-        if (!audioCtx) return;
+        if (!audioCtx || !soundEnabled) return;
         
         const osc = audioCtx.createOscillator();
         const gain = audioCtx.createGain();
@@ -145,13 +160,11 @@ canvas {
         osc.type = 'sine';
         
         if (type === 'leaf') {
-            // Softer, deeper 'thump' for leaves
             osc.frequency.setValueAtTime(400, audioCtx.currentTime);
             gain.gain.setValueAtTime(0, audioCtx.currentTime);
             gain.gain.linearRampToValueAtTime(0.03, audioCtx.currentTime + 0.005);
             gain.gain.exponentialRampToValueAtTime(0.001, audioCtx.currentTime + 0.08);
         } else {
-            // Sharper 'click' for rock
             osc.frequency.setValueAtTime(1200, audioCtx.currentTime);
             gain.gain.setValueAtTime(0, audioCtx.currentTime);
             gain.gain.linearRampToValueAtTime(0.05, audioCtx.currentTime + 0.005);
@@ -175,77 +188,101 @@ canvas {
     }
 
     window.addEventListener('resize', resizeCanvas);
-    resize();
 
-    function drawRock() {
-        const gradient = ctx.createRadialGradient(canvas.width/2, canvas.height/2, 10, canvas.width/2, canvas.height/2, canvas.width);
-        gradient.addColorStop(0, '#888');
-        gradient.addColorStop(1, '#666');
-        ctx.fillStyle = gradient;
-        ctx.beginPath();
-        ctx.arc(canvas.width/2, canvas.height/2, canvas.width/2.2, 0, Math.PI * 2);
-        ctx.fill();
-    }
-
-    function drawMoss() {
-        mossPatches.forEach(patch => {
-            ctx.fillStyle = (weather === 'sunny') ? '#8a9a5b' : '#2e8b57';
-            ctx.beginPath();
-            ctx.arc(patch.x, patch.y, patch.size, 0, Math.PI * 2);
-            ctx.fill();
-        });
-    }
-
-    function animate() {
-        ctx.clearRect(0, 0, canvas.width, canvas.height);
-        drawRock();
-        drawMoss();
-
-        if (weather === 'rainy' && audioCtx) {
-            if (Math.random() < 0.05) {
-                const type = (mossPatches.length > 0 && Math.random() < 0.7) ? 'leaf' : 'rock';
-                playTapSound(type);
+    function setWeather(newWeather) {
+        initAudio();
+        weather = newWeather;
+        
+        if (weather === 'sunny') {
+            sunnyBtn.classList.add('active-weather');
+            rainyBtn.classList.remove('active-weather');
+            if (rainNoise) {
+                rainNoise.gain.gain.exponentialRampToValueAtTime(0.001, audioCtx.currentTime + 0.5);
+                setTimeout(() => {
+                    if (rainNoise.source) rainNoise.source.stop();
+                }, 500);
+                rainNoise = null;
             }
+            statusText.innerText = "It's a sunny day!";
+        } else {
+            rainyBtn.classList.add('active-weather');
+            sunnyBtn.classList.remove('active-weather');
+            if (!rainNoise) {
+                rainNoise = createRainSound();
+                rainNoise.source.start();
+            }
+            statusText.innerText = "It's raining softy...";
         }
-
-        requestAnimationFrame(animate);
     }
+
+    sunnyBtn.addEventListener('click', () => setWeather('sunny'));
+    rainyBtn.addEventListener('click', () => setWeather('rainy'));
+
+    soundToggle.addEventListener('click', () => {
+        soundEnabled = !soundEnabled;
+        soundToggle.innerText = soundEnabled ? "Sound: On" : "Sound: Off";
+        
+        if (!soundEnabled && rainNoise) {
+            rainNoise.gain.gain.setValueAtTime(0, audioCtx.currentTime);
+        } else if (soundEnabled && rainNoise) {
+            rainNoise.gain.gain.setValueAtTime(0.1, audioCtx.currentTime);
+        }
+    });
 
     canvas.addEventListener('mousedown', (e) => {
-        initAudio();
         const rect = canvas.getBoundingClientRect();
         const x = e.clientX - rect.left;
         const y = e.clientY - rect.top;
-        mossPatches.push({ x, y, size: Math.random() * 10 + 5 });
-    });
+        
+        mossPatches.push({
+            x: x,
+            y: y,
+            size: Math.random() * 10 + 5,
+            color: weather === 'sunny' ? `hsl(80, 60%, ${30 + Math.random() * 20}%)` : `hsl(120, 60%, ${20 + Math.random() * 20}%)`
+        });
 
-    sunnyBtn.addEventListener('click', () => {
-        initAudio();
-        weather = 'sunny';
-        sunnyBtn.classList.add('active-weather');
-        rainyBtn.classList.remove('active-weather');
-        if (rainNoise) {
-            rainNoise.gain.gain.exponentialRampToValueAtTime(0.0001, audioCtx.currentTime + 0.5);
-            setTimeout(() => rainNoise.source.stop(), 600);
-            rainNoise = null;
+        if (weather === 'rainy') {
+            playTapSound(Math.random() > 0.5 ? 'leaf' : 'rock');
         }
-        statusText.innerText = 'The sun is out!';
     });
 
-    rainyBtn.addEventListener('click', () => {
-        initAudio();
-        weather = 'rainy';
-        rainyBtn.classList.add('active-weather');
-        sunnyBtn.classList.remove('active-weather');
-        if (!rainNoise) {
-            rainNoise = createRainSound();
-            rainNoise.source.start();
+    function draw() {
+        ctx.clearRect(0, 0, canvas.width, canvas.height);
+        
+        // Rock base texture
+        ctx.fillStyle = '#7a7a7a';
+        ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+        mossPatches.forEach(patch => {
+            ctx.beginPath();
+            ctx.arc(patch.x, patch.y, patch.size, 0, Math.PI * 2);
+            ctx.fillStyle = patch.color;
+            ctx.fill();
+        });
+
+        if (weather === 'rainy') {
+            ctx.strokeStyle = 'rgba(170, 218, 255, 0.5)';
+            ctx.lineWidth = 1;
+            for (let i = 0; i < 20; i++) {
+                const rx = Math.random() * canvas.width;
+                const ry = Math.random() * canvas.height;
+                ctx.beginPath();
+                ctx.moveTo(rx, ry);
+                ctx.lineTo(rx - 2, ry + 10);
+                ctx.stroke();
+            }
+            
+            // Random rain taps
+            if (Math.random() > 0.95) {
+                playTapSound(Math.random() > 0.5 ? 'leaf' : 'rock');
+            }
         }
-        statusText.innerText = 'It is raining...';
-    });
 
-    animate();
+        requestAnimationFrame(draw);
+    }
+
+    resizeCanvas();
+    draw();
 </script>
-
 </body>
 </html>
