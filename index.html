@@ -101,14 +101,48 @@ canvas {
     let weather = 'sunny';
     let mossPatches = [];
 
+    // Audio Context for rain sound
+    let audioCtx = null;
+    let rainNode = null;
+
+    function initAudio() {
+        if (audioCtx) return;
+        audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+    }
+
+    function createRainSound() {
+        // Create white noise for the base rain sound
+        const bufferSize = audioCtx.sampleRate * 2;
+        const buffer = audioCtx.createBuffer(1, bufferSize, audioCtx.sampleRate);
+        const data = buffer.getChannelData(0);
+        for (let i = 0; i < bufferSize; i++) {
+            data[i] = Math.random() * 2 - 1;
+        }
+
+        const noise = audioCtx.createBufferSource();
+        noise.buffer = buffer;
+        noise.loop = true;
+        
+        const filter = audioCtx.createBiquadFilter();
+        filter.type = 'lowpass';
+        filter.frequency.value = 400;
+        
+        const gainNode = audioCtx.createGain();
+        gainNode.gain.value = 0.1;
+
+        noise.connect(filter);
+        filter.connect(gainNode);
+        gainNode.connect(audioCtx.destination);
+
+        return { source: noise, gain: gainNode };
+    }
+
     function resize() {
         canvas.width = window.innerWidth * 0.8;
         canvas.height = window.innerHeight * 0.8;
     }
 
     function resizeCanvas() {
-        // We keep the moss patches relative to the screen size if possible,
-        // but for simplicity, we will just let them keep their positions
         resize();
     }
 
@@ -116,11 +150,9 @@ canvas {
     resize();
 
     function drawRock() {
-        // Create a gradient for the rock background
         const gradient = ctx.createRadialGradient(canvas.width/2, canvas.height/2, 10, canvas.width/2, canvas.height/2, canvas.width);
         gradient.addColorStop(0, '#888');
         gradient.addColorStop(1, '#666');
-        
         ctx.fillStyle = gradient;
         ctx.fillRect(0, 0, canvas.width, canvas.height);
     }
@@ -135,9 +167,9 @@ canvas {
         ctx.fillStyle = color;
         ctx.fill();
         
-        // Add some texture to the moss
         for (let i = 0; i < 5; i++) {
-            ctx.beginPath();n            ctx.arc(patch.x + (Math.random() - 0.5) * 10, patch.y + (Math.random() - 0.5) * 10, size * 0.4, 0, Math.PI * 2);
+            ctx.beginPath();
+            ctx.arc(patch.x + (Math.random() - 0.5) * 10, patch.y + (Math.random() - 0.5) * 10, size * 0.4, 0, Math.PI * 2);
             ctx.fillStyle = color;
             ctx.fill();
         }
@@ -146,10 +178,10 @@ canvas {
     function render() {
         drawRock();
         mossPatches.forEach(drawMoss);
-        
         if (weather === 'rainy') {
             drawRain();
         }
+        requestAnimationFrame(render);
     }
 
     function drawRain() {
@@ -159,14 +191,14 @@ canvas {
             const x = Math.random() * canvas.width;
             const y = Math.random() * canvas.height;
             ctx.beginPath();
-            ctx.moveTo(x, 0);
             ctx.moveTo(x, y);
             ctx.lineTo(x, y + 10);
             ctx.stroke();
         }
-    } 보니
+    }
 
     canvas.addEventListener('mousedown', (e) => {
+        initAudio();
         const rect = canvas.getBoundingClientRect();
         const x = e.clientX - rect.left;
         const y = e.clientY - rect.top;
@@ -179,27 +211,31 @@ canvas {
     });
 
     sunnyBtn.addEventListener('click', () => {
+        initAudio();
         weather = 'sunny';
         sunnyBtn.classList.add('active-weather');
         rainyBtn.classList.remove('active-weather');
-        statusText.innerText = 'The moss is resting in the sun.';
+        if (rainNode) {
+            rainNode.source.stop();
+            rainNode = null;
+        }
+        statusText.innerText = "It's a sunny day!";
     });
 
     rainyBtn.addEventListener('click', () => {
+        initAudio();
         weather = 'rainy';
         rainyBtn.classList.add('active-weather');
         sunnyBtn.classList.remove('active-weather');
-        statusText.innerText = 'The moss drinks the rain!';
+        
+        if (!rainNode) {
+            rainNode = createRainSound();
+            rainNode.source.start();
+        }
+        statusText.innerText = "It's raining softly...";
     });
 
-    function animate() {
-        render();
-        requestAnimationFrame(animate);
-    }
-
-    animate();
-
+    render();
 </script>
-
 </body>
-</html>
+</html>}],
