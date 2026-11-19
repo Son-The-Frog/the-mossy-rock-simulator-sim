@@ -1,0 +1,205 @@
+<html>
+<head>
+<style>
+body {
+    margin: 0;
+    padding: 0;
+    overflow: hidden;
+    background-color: #4a4a4a;
+    font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    height: 100vh;
+}
+
+#canvas-container {
+    position: relative;
+    box-shadow: 0 10px 30px rgba(0,0,0,0.5);
+    border: 10px solid #333;
+    border-radius: 15px;
+}
+
+canvas {
+    cursor: crosshair;
+    display: block;
+    background-color: #7a7a7a;
+}
+
+#ui-panel {
+    position: absolute;
+    top: 20px;
+    left: 20px;
+    background: rgba(255, 255, 255, 0.8);
+    padding: 15px;
+    border-radius: 10px;
+    pointer-events: auto;
+    user-select: none;
+    width: 200px;
+}
+
+#ui-panel h2 {
+    margin: 0 0 10px 0;
+    font-size: 18px;
+    color: #333;
+}
+
+.weather-btn {
+    display: block;
+    width: 100%;
+    padding: 10px;
+    margin: 5px 0;
+    border: none;
+    border-radius: 5px;
+    cursor: pointer;
+    font-weight: bold;
+    transition: background 0.3s;
+}
+
+.sunny-btn {
+    background: #ffd700; color: #333;
+}
+
+.rainy-btn {
+    background: #aaddff; color: #333;
+}
+
+.active-weather {
+    outline: 3px solid #000;
+    box-shadow: 0 0 10px rgba(0,0,0,0.3);
+}
+
+#status-text {
+    margin-top: 10px;
+    font-size: 14px;
+    color: #555;
+    text-align: center;
+}
+
+</style>
+</head>
+<body>
+
+<div id="canvas-container">
+    <div id="ui-panel">
+        <h2>Mossy Rock</h2>
+        <button id="sunny-btn" class="weather-btn sunny-btn active-weather">Sunny</button>
+        <button id="rainy-btn" class="weather-btn rainy-btn">Rainy</button>
+        <div id="status-text">Click to plant moss!</div>
+    </div>
+    <canvas id="mossCanvas"></canvas>
+</div>
+
+<script>
+    const canvas = document.getElementById('mossCanvas');
+    const ctx = canvas.getContext('2d');
+    const sunnyBtn = document.getElementById('sunny-btn');
+    const rainyBtn = document.getElementById('rainy-btn');
+    const statusText = document.getElementById('status-text');
+
+    let weather = 'sunny';
+    let mossPatches = [];
+
+    function resize() {
+        canvas.width = window.innerWidth * 0.8;
+        canvas.height = window.innerHeight * 0.8;
+    }
+
+    function resizeCanvas() {
+        // We keep the moss patches relative to the screen size if possible,
+        // but for simplicity, we will just let them keep their positions
+        resize();
+    }
+
+    window.addEventListener('resize', resizeCanvas);
+    resize();
+
+    function drawRock() {
+        // Create a gradient for the rock background
+        const gradient = ctx.createRadialGradient(canvas.width/2, canvas.height/2, 10, canvas.width/2, canvas.height/2, canvas.width);
+        gradient.addColorStop(0, '#888');
+        gradient.addColorStop(1, '#666');
+        
+        ctx.fillStyle = gradient;
+        ctx.fillRect(0, 0, canvas.width, canvas.height);
+    }
+
+    function drawMoss(patch) {
+        const isRainy = weather === 'rainy';
+        const color = isRainy ? 'rgba(34, 139, 34, 0.8)' : 'rgba(107, 142, 35, 0.8)';
+        const size = isRainy ? patch.size * 1.2 : patch.size;
+        
+        ctx.beginPath();
+        ctx.arc(patch.x, patch.y, size, 0, Math.PI * 2);
+        ctx.fillStyle = color;
+        ctx.fill();
+        
+        // Add some texture to the moss
+        for (let i = 0; i < 5; i++) {
+            ctx.beginPath();n            ctx.arc(patch.x + (Math.random() - 0.5) * 10, patch.y + (Math.random() - 0.5) * 10, size * 0.4, 0, Math.PI * 2);
+            ctx.fillStyle = color;
+            ctx.fill();
+        }
+    }
+
+    function render() {
+        drawRock();
+        mossPatches.forEach(drawMoss);
+        
+        if (weather === 'rainy') {
+            drawRain();
+        }
+    }
+
+    function drawRain() {
+        ctx.strokeStyle = 'rgba(173, 216, 230, 0.5)';
+        ctx.lineWidth = 1;
+        for (let i = 0; i < 100; i++) {
+            const x = Math.random() * canvas.width;
+            const y = Math.random() * canvas.height;
+            ctx.beginPath();
+            ctx.moveTo(x, 0);
+            ctx.moveTo(x, y);
+            ctx.lineTo(x, y + 10);
+            ctx.stroke();
+        }
+    } 보니
+
+    canvas.addEventListener('mousedown', (e) => {
+        const rect = canvas.getBoundingClientRect();
+        const x = e.clientX - rect.left;
+        const y = e.clientY - rect.top;
+        
+        mossPatches.push({
+            x: x,
+            y: y,
+            size: Math.random() * 15 + 10
+        });
+    });
+
+    sunnyBtn.addEventListener('click', () => {
+        weather = 'sunny';
+        sunnyBtn.classList.add('active-weather');
+        rainyBtn.classList.remove('active-weather');
+        statusText.innerText = 'The moss is resting in the sun.';
+    });
+
+    rainyBtn.addEventListener('click', () => {
+        weather = 'rainy';
+        rainyBtn.classList.add('active-weather');
+        sunnyBtn.classList.remove('active-weather');
+        statusText.innerText = 'The moss drinks the rain!';
+    });
+
+    function animate() {
+        render();
+        requestAnimationFrame(animate);
+    }
+
+    animate();
+
+</script>
+
+</body>
+</html>
