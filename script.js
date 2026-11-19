@@ -18,6 +18,88 @@ const COLORS = {
     rainy: { moss: '#3d6321', rock: '#5a5a5a' }
 };
 
+// --- Audio System ---
+let audioCtx = null;
+let rainNoise = null;
+let rainNoiseGain = null;
+
+function initAudio() {
+    if (audioCtx) return;
+    audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+}
+
+function createRainNoise() {
+    const bufferSize = 2 * audioCtx.sampleRate;
+    const buffer = audioCtx.createBuffer(1, bufferSize, audioCtx.sampleRate);
+    const output = buffer.getChannelData(0);
+    for (let i = 0; i < bufferSize; i++) {
+        output[i] = Math.random() * 2 - 1;
+    }
+    
+    const whiteNoise = audioCtx.createBufferSource();
+    whiteNoise.buffer = buffer;
+    whiteNoise.loop = true;
+    
+    const filter = audioCtx.createBiquadFilter();
+    filter.type = 'lowpass';
+    filter.frequency.value = 1200;
+    
+    const gainNode = audioCtx.createGain();
+    gainNode.gain.value = 0;
+    
+    whiteNoise.connect(filter);
+    filter.connect(gainNode);
+    gainNode.connect(audioCtx.destination);
+    
+    return { source: whiteNoise, gain: gainNode };
+}
+
+function playDropSound(type) {
+    if (!audioCtx || !soundEnabled) return;
+    
+    const oscillator = audioCtx.createOscillator();
+    const gain = audioCtx.createGain();
+    
+    oscillator.type = 'sine';
+    // Rock tap: higher pitch, shorter
+    // Leaf tap: lower pitch, softer
+    const freq = type === 'rock' ? 800 + Math.random() * 400 : 400 + Math.random() * 200;
+    oscillator.frequency.setValueAtTime(freq, audioCtx.currentTime);
+    oscillator.frequency.exponentialRampToValueAtTime(0.01, audioCtx.currentTime + 0.1);
+    
+    gain.gain.setValueAtTime(0.1, audioCtx.currentTime);
+    gain.gain.exponentialRampToValueAtTime(0.01, audioCtx.currentTime + 0.1);
+    
+    oscillator.connect(gain);
+    gain.connect(audioCtx.destination);
+    
+    oscillator.start();
+    oscillator.stop(audioCtx.currentTime + 0.1);
+}
+
+function updateRainAudio() {
+    if (!audioCtx) return;
+    if (isRainy) {
+        if (!rainNoise) {
+            const noise = createRainNoise();
+            rainNoise = noise.source;
+            rainNoiseGain = noise.gain;
+            rainNoise.start();
+        }
+        rainNoiseGain.gain.setTargetAtTime(0.15, audioCtx.currentTime, 0.1);
+    } else {
+        if (rainNoiseGain) {
+            rainNoiseGain.gain.setTargetAtTime(0, audioCtx.currentTime, 0.1);
+        }
+    }
+    
+    if (!soundEnabled) {
+        if (rainNoiseGain) rainNoiseGain.gain.setValueAtTime(0, audioCtx.currentTime);
+    }
+}
+
+// --- End Audio System ---
+
 class MossPatch {
     constructor(x, y) {
         this.x = x;
@@ -28,7 +110,6 @@ class MossPatch {
         this.opacity = 0;
         this.fadeSpeed = 0.01 + Math.random() * 0.02;
         
-        // Bounce animation properties
         this.bounceOffset = 0;
         this.bounceVelocity = 0;
         this.bounceGravity = 0.15;
@@ -44,7 +125,6 @@ class MossPatch {
             this.opacity += this.fadeSpeed;
         }
 
-        // Small bounce effect when planted
         if (this.bounceVelocity !== 0) {
             this.bounceOffset += this.bounceVelocity;
             this.bounceVelocity -= this.bounceGravity;
@@ -60,7 +140,6 @@ class MossPatch {
         const color = isRainy ? COLORS.rainy.moss : COLORS.sunny.moss;
         ctx.globalAlpha = this.opacity;
         ctx.beginPath();
-        // Apply bounce offset to the y coordinate
         ctx.arc(this.x, this.y + this.bounceOffset, this.size, 0, Math.PI * 2);
         ctx.fillStyle = color;
         ctx.fill();
@@ -68,12 +147,6 @@ class MossPatch {
         ctx.globalAlpha = 1.0;
     }
 
-    // Method to trigger the bounce
-    bounce() {
-        this.bounceVelocity = 2 + Math.random() * 2;
-    }
-
-    // Simplified version of the bounce for the 'planting' moment
     initBounce() {
         this.bounceVelocity = 1.5 + Math.random() * 1.5;
     }
@@ -105,6 +178,7 @@ class Ripple {
 }
 
 function plantMoss(e) {
+    initAudio();
     const rect = canvas.getBoundingClientRect();
     const x = e.clientX - rect.left;
     const y = e.clientY - rect.top;
@@ -116,10 +190,12 @@ function plantMoss(e) {
 }
 
 function toggleWeather(rainy) {
+    initAudio();
     isRainy = rainy;
     sunnyBtn.classList.toggle('active-weather', !rainy);
     rainyBtn.classList.toggle('active-weather', rainy);
     statusText.innerText = rainy ? "It's raining... the moss looks darker." : "Click to plant moss!";
+    updateRainAudio();
 }
 
 function animate() {
@@ -131,6 +207,8 @@ function animate() {
         ripple.update();
         if (ripple.opacity <= 0) {
             ripples.splice(index, 1);
+        } else {
+            ripple.draw();
         }
     });
 
@@ -147,6 +225,14 @@ function animate() {
             ctx.moveTo(Math.random() * canvas.width, Math.random() * canvas.height);
             ctx.lineTo(Math.random() * canvas.width, Math.random() * canvas.height);
             ctx.stroke();
+        } 
+        
+        // Randomly play tap sounds
+        if (Math.random() < 0.05) {
+            playDropSound('rock');
+        }
+        if (Math.random() < 0.03) {
+            playDropSound('leaf');
         }
     }
 
@@ -162,6 +248,5 @@ rainyBtn.addEventListener('click', () => toggleWeather(true));
 soundToggle.addEventListener('click', () => {
     soundEnabled = !soundEnabled;
     soundToggle.innerText = `Sound: ${soundEnabled ? 'On' : 'Off'}`;
+    updateRainAudio();
 });
-
-animate();
