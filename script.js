@@ -25,20 +25,28 @@ class MossPatch {
         this.size = Math.random() * 10 + 5;
         this.growthRate = Math.random() * 0.02 + 0.01;
         this.maxSize = this.size * (2 + Math.random() * 2);
+        this.opacity = 0;
+        this.fadeSpeed = 0.01 + Math.random() * 0.02;
     }
 
     update() {
         if (this.size < this.maxSize) {
             this.size += this.growthRate;
         }
+        if (this.opacity < 1) {
+            this.opacity += this.fadeSpeed;
+        }
     }
 
     draw() {
+        const color = isRainy ? COLORS.rainy.moss : COLORS.sunny.moss;
+        ctx.globalAlpha = this.opacity;
         ctx.beginPath();
         ctx.arc(this.x, this.y, this.size, 0, Math.PI * 2);
-        ctx.fillStyle = isRainy ? COLORS.rainy.moss : COLORS.sunny.moss;
+        ctx.fillStyle = color;
         ctx.fill();
         ctx.closePath();
+        ctx.globalAlpha = 1.0;
     }
 }
 
@@ -102,10 +110,12 @@ function animate() {
         patch.draw();
     });
 
-    ripples = ripples.filter(r => r.opacity > 0);
-    ripples.forEach(ripple => {
+    ripples.forEach((ripple, index) => {
         ripple.update();
         ripple.draw();
+        if (ripple.opacity <= 0) {
+            ripples.splice(index, 1);
+        }    
     });
 
     requestAnimationFrame(animate);
