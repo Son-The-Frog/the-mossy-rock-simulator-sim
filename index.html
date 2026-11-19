@@ -19,12 +19,14 @@ body {
     box-shadow: 0 10px 30px rgba(0,0,0,0.5);
     border: 10px solid #333;
     border-radius: 15px;
+    filter: drop-shadow(0 15px 10px rgba(0,0,0,0.4));
 }
 
 canvas {
     cursor: crosshair;
     display: block;
     background-color: #7a7a7a;
+    border-radius: 5px;
 }
 
 #ui-panel {
@@ -37,6 +39,7 @@ canvas {
     pointer-events: auto;
     user-select: none;
     width: 200px;
+    z-index: 10;
 }
 
 #ui-panel h2 {
@@ -178,58 +181,57 @@ canvas {
         osc.stop(audioCtx.currentTime + 0.1);
     }
 
-    function resize() {
-        canvas.width = window.innerWidth * 0.8;
-        canvas.height = window.innerHeight * 0.8;
-    }
-
     function resizeCanvas() {
-        resize();
+        canvas.width = 600;
+        canvas.height = 400;
     }
 
-    window.addEventListener('resize', resizeCanvas);
+    function drawRock() {
+        // Background
+        ctx.fillStyle = '#7a7a7a';
+        ctx.fillRect(0, 0, canvas.width, canvas.height);
 
-    function setWeather(newWeather) {
-        initAudio();
-        weather = newWeather;
-        
-        if (weather === 'sunny') {
-            sunnyBtn.classList.add('active-weather');
-            rainyBtn.classList.remove('active-weather');
-            if (rainNoise) {
-                rainNoise.gain.gain.exponentialRampToValueAtTime(0.001, audioCtx.currentTime + 0.5);
-                setTimeout(() => {
-                    if (rainNoise.source) rainNoise.source.stop();
-                }, 500);
-                rainNoise = null;
-            }
-            statusText.innerText = "It's a sunny day!";
-        } else {
-            rainyBtn.classList.add('active-weather');
-            sunnyBtn.classList.remove('active-weather');
-            if (!rainNoise) {
-                rainNoise = createRainSound();
-                rainNoise.source.start();
-            }
-            statusText.innerText = "It's raining softy...";
+        // Adding a soft shadow gradient to the bottom of the rock
+        const gradient = ctx.createLinearGradient(0, canvas.height * 0.7, 0, canvas.height);
+        gradient.addColorStop(0, 'rgba(0, 0, 0, 0)');
+        gradient.addColorStop(1, 'rgba(0, 0, 0, 0.2)');
+        ctx.fillStyle = gradient;
+        ctx.fillRect(0, 0, canvas.width, canvas.height);
+    }
+
+    function drawMoss() {
+        mossPatches.forEach(patch => {
+            const color = weather === 'sunny' ? '#8db600' : '#4b631d';
+            ctx.fillStyle = color;
+            ctx.beginPath();
+            ctx.arc(patch.x, patch.y, patch.radius, 0, Math.PI * 2);
+            ctx.fill();
+        });
+    }
+
+    function drawRain() {
+        if (weather !== 'rainy') return;
+        ctx.strokeStyle = 'rgba(170, 194, 255, 0.5)';
+        ctx.lineWidth = 1;
+        for (let i = 0; i < 20; i++) {
+            const x = Math.random() * canvas.width;
+            const y = Math.random() * canvas.height;
+            ctx.beginPath();
+            ctx.moveTo(x, y);
+            ctx.lineTo(x, y + 10);
+            ctx.stroke();
         }
     }
 
-    sunnyBtn.addEventListener('click', () => setWeather('sunny'));
-    rainyBtn.addEventListener('click', () => setWeather('rainy'));
-
-    soundToggle.addEventListener('click', () => {
-        soundEnabled = !soundEnabled;
-        soundToggle.innerText = soundEnabled ? "Sound: On" : "Sound: Off";
-        
-        if (!soundEnabled && rainNoise) {
-            rainNoise.gain.gain.setValueAtTime(0, audioCtx.currentTime);
-        } else if (soundEnabled && rainNoise) {
-            rainNoise.gain.gain.setValueAtTime(0.1, audioCtx.currentTime);
-        }
-    });
+    function update() {
+        drawRock();
+        drawMoss();
+        drawRain();
+        requestAnimationFrame(update);
+    }
 
     canvas.addEventListener('mousedown', (e) => {
+        initAudio();
         const rect = canvas.getBoundingClientRect();
         const x = e.clientX - rect.left;
         const y = e.clientY - rect.top;
@@ -237,52 +239,56 @@ canvas {
         mossPatches.push({
             x: x,
             y: y,
-            size: Math.random() * 10 + 5,
-            color: weather === 'sunny' ? `hsl(80, 60%, ${30 + Math.random() * 20}%)` : `hsl(120, 60%, ${20 + Math.random() * 20}%)`
+            radius: Math.random() * 15 + 5
         });
-
+        
         if (weather === 'rainy') {
-            playTapSound(Math.random() > 0.5 ? 'leaf' : 'rock');
+            playTapSound('rock');
         }
     });
 
-    function draw() {
-        ctx.clearRect(0, 0, canvas.width, canvas.height);
-        
-        // Rock base texture
-        ctx.fillStyle = '#7a7a7a';
-        ctx.fillRect(0, 0, canvas.width, canvas.height);
+    sunnyBtn.addEventListener('click', () => {
+        weather = 'sunny';
+        sunnyBtn.classList.add('active-weather');
+        rainyBtn.classList.remove('active-weather');
+        if (rainNoise) rainNoise.source.stop();
+        rainNoise = null;
+    });
 
-        mossPatches.forEach(patch => {
-            ctx.beginPath();
-            ctx.arc(patch.x, patch.y, patch.size, 0, Math.PI * 2);
-            ctx.fillStyle = patch.color;
-            ctx.fill();
-        });
-
-        if (weather === 'rainy') {
-            ctx.strokeStyle = 'rgba(170, 218, 255, 0.5)';
-            ctx.lineWidth = 1;
-            for (let i = 0; i < 20; i++) {
-                const rx = Math.random() * canvas.width;
-                const ry = Math.random() * canvas.height;
-                ctx.beginPath();
-                ctx.moveTo(rx, ry);
-                ctx.lineTo(rx - 2, ry + 10);
-                ctx.stroke();
-            }
-            
-            // Random rain taps
-            if (Math.random() > 0.95) {
-                playTapSound(Math.random() > 0.5 ? 'leaf' : 'rock');
-            }
+    rainyBtn.addEventListener('click', () => {
+        weather = 'rainy';
+        rainyBtn.classList.add('active-weather');
+        sunnyBtn.classList.remove('active-weather');
+        initAudio();
+        if (!rainNoise) {
+            rainNoise = createRainSound();
+            rainNoise.source.start();
         }
+    });
 
-        requestAnimationFrame(draw);
-    }
+    rainyBtn.addEventListener('click', () => {
+        weather = 'rainy';
+        rainyBtn.classList.add('active-weather');
+        sunnyBtn.classList.remove('active-weather');
+        initAudio();
+        if (!rainNoise) {
+            rainNoise = createRainSound();n
+            rainNoise.source.start();
+        }
+    });
+
+    soundToggle.addEventListener('click', () => {
+        soundEnabled = !soundEnabled;
+        soundToggle.textContent = `Sound: ${soundEnabled ? 'On' : 'Off'}`;
+        if (!soundEnabled && rainNoise) {
+            rainNoise.gain.gain.value = 0; // Simplified for this step
+        } else if (soundEnabled && rainNoise) {
+            rainNoise.gain.gain.value = 0.1;
+        }
+    });
 
     resizeCanvas();
-    draw();
+    update();
 </script>
 </body>
 </html>
