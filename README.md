@@ -4,13 +4,13 @@ A simple generative art page where you can click to plant moss on a rock-colored
 
 ## Features
 - Plant moss by clicking on the rock surface.
+- Moss grows slightly larger over time after planting.
 - Toggle between Sunny and Rainy weather.
-- Realistic rain sounds (ambient noise + tap-tap-tap effects).
-- Dynamic moss colors: light greens for sunny days, deep greens for rainy days, with varied shades within each weather state.
-- Rock texture effect created by random noise.
+- Realistic rain sounds (white noise and tap-tap-tap sounds).
+- Responsive moss colors based on weather.
 
 ## How to Use
 1. Open the index.html file.
-2. Click anywhere on the canvas to add a moss patch.
-3. Use the weather buttons to switch between the weather states.
-4. Ensure sound is enabled to hear the rain sounds.
+2. Click anywhere on the rock surface to plant moss.
+3. Watch the moss grow and grow!
+4. Switch weather to see the moss colors shift and rainy atmosphere.

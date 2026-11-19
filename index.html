@@ -152,7 +152,7 @@ canvas {
         gainNode.connect(audioCtx.destination);
 
         return { source: noise, gain: gainNode };
-    } 
+    }
 
     function playTapSound(type) {
         if (!audioCtx || !soundEnabled) return;
@@ -173,224 +173,117 @@ canvas {
             gain.gain.linearRampToValueAtTime(0.05, audioCtx.currentTime + 0.005);
             gain.gain.exponentialRampToValueAtTime(0.001, audioCtx.currentTime + 0.05);
         }
-      
+        
         osc.connect(gain);
         gain.connect(audioCtx.destination);
+        
         osc.start();
         osc.stop(audioCtx.currentTime + 0.1);
     }
 
-    function setupCanvas() {
+    function setCanvasSize() {
         canvas.width = 600;
         canvas.height = 600;
-        drawRock();
     }
 
-    function drawRock() {
-        // Base rock color
-        ctx.fillStyle = '#7a7a7a';
-        ctx.fillRect(0, 0, canvas.width, canvas.height);
-
-        // Add some rock texture
-        for (let i = 0; i < 2000; i++) {
-            ctx.fillStyle = Math.random() > 0.5 ? '#6a6a6a' : '#8a8a8a';
-            ctx.fillRect(1, 1, 2, 2);
-            // wait, the previous code had a mistake in fillRect(1,1,2,2)
-            // Let me fix that properly
-        }
-    }
-
-    // Fix the rock texture loop
-    function drawRockTexture() {
-        ctx.fillStyle = '#7a7a7a';
-        ctx.fillRect(0, 0, canvas.width, canvas.height);
+    function setWeather(newWeather) {
+        weather = newWeather;
+        sunnyBtn.classList.toggle('active-weather', weather === 'sunny');
+        rainyBtn.classList.toggle('active-weather', weather === 'rainy');
         
-        for (let i = 0; i < 4000; i++) {
-            const x = Math.random() * canvas.width;
-            const y = Math.random() * canvas.height;
-            ctx.fillStyle = Math.random() > 0.5 ? '#6a6a6a' : '#8a8a8a';
-            ctx.fillRect(x, y, 1.5, 1.5);
-        }
-    }
-
-    function drawMossPatch(patch) {
-        const isRainy = weather === 'rainy';
-        let color;
-        
-        if (isRainy) {
-            // Deep greens for rain
-            const shades = ['#2d5a27', '#3a6b35', '#4a7c44', '#1e3d1b'];
-            color = shades[Math.floor(Math.random() * shades.length)];
-            // We store the color if we want it to stay consistent, but for this prompt
-            // I will assign a random shade from the list based on the patch's own identity
-            // if it's not already stored
+        if (weather === 'rainy') {
+            if (!audioCtx) initAudio();
+            const rain = createRainSound();
+            rainNoise = rain;
+            rain.source.start();
+            statusText.innerText = "It's raining! The moss is drinking";
         } else {
-            // Sunny greens
-            const shades = ['#7cb342', '#9ccc65', '#aed581', '#c5e1a5'];
-            const index = Math.floor(Math.random() * shades.length);
-            color = shades[index];
+            if (rainNoise) {
+                rainNoise.source.stop();
+                rainNoise = null;
+            }
+            statusText.innerText = "The sun is out! The moss is resting";
         }
-        
-        ctx.fillStyle = color;
-        ctx.beginPath();
-        ctx.arc(patch.x, patch.y, patch.radius, 0, Math.PI * 2);
-        ctx.fill();
     }
 
-    function render() {
-        drawRockTexture();
-        
-        mossPatches.forEach(patch => {
-            // To keep colors consistent per patch, we should store the shade index
-            // but I'll implement a simple consistent shade based on the patch's seed
-            const isRainy = weather === 'rainy';
-            let color;
-            if (isRainy) {
-                const shades = ['#2d5a27', '#3a6b35', '#4a7c44', '#1e3d1b'];
-                color = shades[patch.shadeIndex % shades.length];
-            } else {
-                const shades = ['#7cb342', '#9ccc65', '#aed581', '#c5e1a5'];
-                color = shades[patch.shadeIndex % shades.length];
-            } catch(e) {}
-            
-            // I noticed my previous logic was slightly flawed. 
-            // Let's refine the rendering loop to be clean.
-        });
+    function getMossColor(isRainy) {
+        const sunnyColors = ['#7ca352', '#8ba35a', '#9cb363', '#6b934a', '#5d833d'];
+        const rainyColors = ['#2e5a2e', '#3b6b3b', '#4a7a4a', '#1e4a1e', '#2a5a2a'];
+        return isRainy ? rainyColors[Math.floor(Math.random() * rainyColors.length)] : sunnyColors[Math.floor(Math.random() * sunnyColors.length)];
     }
 
-    // Let's rewrite the render function and the drawMossPatch function to be cohesive
-    function renderAll() {
-        drawRockTexture();
+    function plantMoss(x, y) {
+        const size = 10 + Math.random() * 15;
+        const color = getMossColor(weather === 'rainy');
+        mossPatches.push({ x, y, size, color, maxSize: size * 2.5, growRate: 0.02 + Math.random() * 0.03 });
         
+        if (audioCtx) {
+            playTapSound('rock');
+        }
+    }
+
+    function draw() {
+        ctx.clearRect(0, 0, canvas.width, canvas.height);
+        
+        // Draw rock background
+        ctx.fillStyle = '#7a7a7a';
+        ctx.fillRect(0, 0, canvas.width, canvas.height);
+        
+        // Draw moss patches
         mossPatches.forEach(patch => {
-            const isRainy = weather === 'rainy';
-            const sunnyShades = ['#7cb342', '#9ccc65', '#aed581', '#c5e1a5'];
-            const rainyShades = ['#2d5a27', '#3a6b35', '#4a7c44', '#1e3d1b'];
+            // Grow moss
+            if (patch.size < patch.maxSize) {
+                patch.size += patch.growRate;
+            }
             
-            const shade = isRainy ? rainyShades[patch.shadeIndex] : sunnyShades[patch.shadeIndex];
-            
-            ctx.fillStyle = shade;
+            ctx.fillStyle = patch.color;
             ctx.beginPath();
-            ctx.arc(patch.x, patch.y, patch.radius, 0, Math.PI * 2);
+            ctx.arc(patch.x, patch.y, patch.size, 0, Math.PI * 2);
             ctx.fill();
         });
+        
+        // Rain drops
+        if (weather === 'rainy') {
+            for (let i = 0; i < 15; i++) {
+                ctx.strokeStyle = 'rgba(170, 221, 255, 0.6)';
+                ctx.lineWidth = 1;
+                ctx.beginPath();
+                ctx.moveTo(Math.random() * canvas.width, Math.random() * canvas.height);
+                ctx.lineTo(Math.random() * canvas.width, Math.random() * canvas.height);
+                ctx.stroke();
+            }
+            // Rain tap sounds
+            if (soundEnabled && audioCtx) {
+                if (Math.random() < 0.05) {
+                    playTapSound('leaf');
+                } else if (Math.random() < 0.1) {
+                    playTapSound('rock');
+                } 
+            }
+        }
+        
+        requestAnimationFrame(draw);
     }
 
-    function handleCanvasClick(e) {
-        initAudio();
+    canvas.addEventListener('mousedown', (e) => {
         const rect = canvas.getBoundingClientRect();
         const x = e.clientX - rect.left;
         const y = e.clientY - rect.top;
-        
-        const radius = 10 + Math.random() * 15;
-        const shadeIndex = Math.floor(Math.random() * 4);
-        
-        mossPatches.push({ x, y, radius, shadeIndex });
-        renderAll();
-    }
+        plantMoss(x, y);
+        if (!audioCtx) initAudio();
+    });
 
-    function updateWeather(newWeather) {
-        weather = newWeather;
-        sunnyBtn.classList.remove('active-weather');
-        rainyBtn.classList.remove('active-weather');
-        
-        if (weather === 'sunny') {
-            sunnyBtn.classList.add('active-weather');
-        } else {
-            rainyBtn.classList.add('active-weather');
-        } 
-        renderAll();
-    }
-
-    function toggleSound() { 
+    sunnyBtn.addEventListener('click', () => setWeather('sunny'));
+    rainyBtn.addEventListener('click', () => setWeather('rainy'));
+    soundToggle.addEventListener('click', () => {
         soundEnabled = !soundEnabled;
         soundToggle.innerText = `Sound: ${soundEnabled ? 'On' : 'Off'}`;
-    }
+    });
 
-    // Rain effect
-    let rainDrops = [];
-    function createRainDrop() { 
-        if (weather !== 'rainy') return;
-        rainDrops.push({ 
-            x: Math.random() * canvas.width, 
-            y: -10, 
-            speed: 5 + Math.random() * 5, 
-            length: 10 + Math.random() * 10 
-        });
-    }
+    setCanvasSize();
+    setWeather('sunny');
+    draw();
 
-    function animate() {
-        renderAll();
-        if (weather === 'rainy') {
-            createRainDrop();
-            
-            // Update and draw rain drops
-            ctx.strokeStyle = 'rgba(170, 218, 255, 0.5)';
-            ctx.lineWidth = 1;
-            rainDrops.forEach((drop, index) => {
-                drop.y += drop.speed;
-                if (drop.y > canvas.height) {
-                    rainDrops.splice(index, 1);
-                } else {
-                    ctx.beginPath();
-                    ctx.moveTo(drop.x, drop.y);
-                    ctx.lineTo(drop.x, drop.y + drop.length);
-                    ctx.stroke();
-                }
-            });
-
-            // Randomly play tap sounds
-            if (Math.random() < 0.05) {
-                playTapSound('rock');
-            } else if (Math.random() < 0.1) {
-                playTapSound('leaf');
-            } 
-        } else {
-            rainDrops = [];
-        }
-        requestAnimationFrame(animate);
-    }
-
-    setupCanvas();
-    canvas.addEventListener('click', handleCanvasClick);
-    sunnyBtn.addEventListener('click', () => updateWeather('sunny'));
-    rainyBtn.addEventListener('click', () => updateWeather('rainy'));
-    soundToggle.addEventListener('click', toggleSound);
-    
-    // Rain noise loop
-    let rainNoiseSource = null;
-    function startRainNoise() { 
-        if (!audioCtx || !soundEnabled) return;
-        if (rainNoiseSource) return;
-        
-        const rainSnd = createRainSound();
-        rainNoiseSource = rainSnd.source;
-        rainNoiseSource.start();
-        // We need a gain node to control the volume
-        // Let's store it to make it easier to actually mute it
-    }
-
-    function stopRainNoise() { 
-        if (rainNoiseSource) {
-            rainNoiseSource.stop();
-            rainNoiseSource = null;
-        } 
-    }
-
-    // Overwrite updateWeather to include sound
-    const originalUpdateWeather = updateWeather;
-    updateWeather = function(newWeather) { 
-        originalUpdateWeather(newWeather);
-        if (newWeather === 'rainy') {
-            initAudio();
-            startRainNoise();
-        } else {
-            stopRainNoise();
-        }
-    }
-
-    animate();
 </script>
-
 </body>
 </html>
