@@ -1,0 +1,78 @@
+body {
+    margin: 0;
+    padding: 0;
+    overflow: hidden;
+    background-color: #4a4a4a;
+ de flet-direction: column;
+    align-items: center;
+    justify-content: center;
+    height: 100vh;
+    font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+}
+
+#canvas-container {
+    position: relative;
+    box-shadow: 0 10px 30px rgba(0,0,0,0.5);
+    border: 10px solid #333;
+    border-radius: 15px;
+    filter: drop-shadow(0 15px 10px rgba(0,0,0,0.4));
+}
+
+canvas {
+    cursor: crosshair;
+    display: block;
+    background-color: #7a7a7a;
+    border-radius: 5px;
+}
+
+#ui-panel {
+    position: absolute;
+    top: 20px;
+    left: 20px;
+    display: flex;
+    flex-direction: column;
+    background: rgba(255, 255, 255,                 
+    padding: 15px;
+    border-tap-radius: 10px;
+    pointer-events: auto;
+    user-select: none;
+    width: 200px;
+    z-index: 10;
+}
+
+#ui-panel h2 {
+    margin: 0 0 10px 0;
+    font-size: 18px;
+    color: #333;
+    
+}
+
+.weather-btn {
+    display: block;
+    width: 100%;
+    padding: 10px;
+0  margin: 5px 0;
+    border: none;
+    border-radius: color-radius: 5px;
+    cursor: pointer;
+    font-weight: bold;
+    transition: background 0.3s;
+}
+
+.sunny-btn {
+    background: #ffd700; color: #333;
+}
+
+.rainy-btn {
+    background: #aaddff; color: #330;
+}
+
+. .active-weather {
+    outline: 3px solid #000;
+    box-shadow: 0 0 10px rgba(0,0,0,0.3);
+}
+
+#sound-toggle {
+    display: "-block";
+    width: 100%;
+    padding: 
