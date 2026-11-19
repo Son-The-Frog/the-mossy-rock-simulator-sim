@@ -111,7 +111,6 @@ canvas {
     }
 
     function createRainSound() {
-        // Create white noise for the base rain sound
         const bufferSize = audioCtx.sampleRate * 2;
         const buffer = audioCtx.createBuffer(1, bufferSize, audioCtx.sampleRate);
         const data = buffer.getChannelData(0);
@@ -137,26 +136,33 @@ canvas {
         return { source: noise, gain: gainNode };
     }
 
-    function playTapSound() {
+    function playTapSound(type) {
         if (!audioCtx) return;
         
         const osc = audioCtx.createOscillator();
         const gain = audioCtx.createGain();
         
         osc.type = 'sine';
-        // Higher pitch for rock, slightly lower for moss
-        const isMoss = mossPatches.length > 0 && Math.random() > 0.5;
-        osc.frequency.setValueAtTime(isMoss ? 800 : 1200, audioCtx.currentTime);
         
-        gain.gain.setValueAtTime(0, audioCtx.currentTime);
-        gain.gain.linearRampToValueAtTime(0.05, audioCtx.currentTime + 0.005);
-        gain.gain.exponentialRampToValueAtTime(0.001, audioCtx.currentTime + 0.05);
+        if (type === 'leaf') {
+            // Softer, deeper 'thump' for leaves
+            osc.frequency.setValueAtTime(400, audioCtx.currentTime);
+            gain.gain.setValueAtTime(0, audioCtx.currentTime);
+            gain.gain.linearRampToValueAtTime(0.03, audioCtx.currentTime + 0.005);
+            gain.gain.exponentialRampToValueAtTime(0.001, audioCtx.currentTime + 0.08);
+        } else {
+            // Sharper 'click' for rock
+            osc.frequency.setValueAtTime(1200, audioCtx.currentTime);
+            gain.gain.setValueAtTime(0, audioCtx.currentTime);
+            gain.gain.linearRampToValueAtTime(0.05, audioCtx.currentTime + 0.005);
+            gain.gain.exponentialRampToValueAtTime(0.001, audioCtx.currentTime + 0.05);
+        }
         
         osc.connect(gain);
         gain.connect(audioCtx.destination);
         
         osc.start();
-        osc.stop(audioCtx.currentTime + 0.06);
+        osc.stop(audioCtx.currentTime + 0.1);
     }
 
     function resize() {
@@ -176,31 +182,33 @@ canvas {
         gradient.addColorStop(0, '#888');
         gradient.addColorStop(1, '#666');
         ctx.fillStyle = gradient;
-        ctx.fillRect(0, 0, canvas.width, canvas.height);
-    }
-
-    function drawMoss(patch) {
-        const isRainy = weather === 'rainy';
-        const color = isRainy ? 'rgba(34, 139, 34, 0.8)' : 'rgba(107, 142, 35, 0.8)';
-        const size = isRainy ? patch.size * 1.2 : patch.size;
-        
         ctx.beginPath();
-        ctx.arc(patch.x, patch.y, size, 0, Math.PI * 2);
-        ctx.fillStyle = color;
+        ctx.arc(canvas.width/2, canvas.height/2, canvas.width/2.2, 0, Math.PI * 2);
         ctx.fill();
-        
-        for (let i = 0; i < 5; i++) {
-            ctx.beginPath();
-            ctx.arc(patch.x + (Math.random() - 0.5) * 10, patch.y + (Math.random() - 0.5) * 10, size * 0.4, 0, Math.PI * 2);
-            ctx.fillStyle = color;
-            ctx.fill();
-        }
     }
 
-    function render() {
+    function drawMoss() {
+        mossPatches.forEach(patch => {
+            ctx.fillStyle = (weather === 'sunny') ? '#8a9a5b' : '#2e8b57';
+            ctx.beginPath();
+            ctx.arc(patch.x, patch.y, patch.size, 0, Math.PI * 2);
+            ctx.fill();
+        });
+    }
+
+    function animate() {
+        ctx.clearRect(0, 0, canvas.width, canvas.height);
         drawRock();
-        mossPatches.forEach(drawMoss);
-        requestAnimationFrame(render);
+        drawMoss();
+
+        if (weather === 'rainy' && audioCtx) {
+            if (Math.random() < 0.05) {
+                const type = (mossPatches.length > 0 && Math.random() < 0.7) ? 'leaf' : 'rock';
+                playTapSound(type);
+            }
+        }
+
+        requestAnimationFrame(animate);
     }
 
     canvas.addEventListener('mousedown', (e) => {
@@ -208,7 +216,7 @@ canvas {
         const rect = canvas.getBoundingClientRect();
         const x = e.clientX - rect.left;
         const y = e.clientY - rect.top;
-        mossPatches.push({ x, y, size: 10 + Math.random() * 10 });
+        mossPatches.push({ x, y, size: Math.random() * 10 + 5 });
     });
 
     sunnyBtn.addEventListener('click', () => {
@@ -217,10 +225,11 @@ canvas {
         sunnyBtn.classList.add('active-weather');
         rainyBtn.classList.remove('active-weather');
         if (rainNoise) {
-            rainNoise.gain.gain.setValueAtTime(0, audioCtx.currentTime);
-            rainNoise.source.stop(audioCtx.currentTime + 0.1);
+            rainNoise.gain.gain.exponentialRampToValueAtTime(0.0001, audioCtx.currentTime + 0.5);
+            setTimeout(() => rainNoise.source.stop(), 600);
             rainNoise = null;
         }
+        statusText.innerText = 'The sun is out!';
     });
 
     rainyBtn.addEventListener('click', () => {
@@ -232,18 +241,11 @@ canvas {
             rainNoise = createRainSound();
             rainNoise.source.start();
         }
+        statusText.innerText = 'It is raining...';
     });
 
-    // Randomly trigger tap sounds during rain
-    setInterval(() => {
-        if (weather === 'rainy') {
-            if (Math.random() > 0.7) {
-                playTapSound();
-            }
-        }
-    }, 150);
-
-    render();
+    animate();
 </script>
+
 </body>
 </html>
