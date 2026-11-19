@@ -27,6 +27,13 @@ class MossPatch {
         this.maxSize = this.size * (2 + Math.random() * 2);
         this.opacity = 0;
         this.fadeSpeed = 0.01 + Math.random() * 0.02;
+        
+        // Bounce animation properties
+        this.bounceOffset = 0;
+        this.bounceVelocity = 0;
+        this.bounceGravity = 0.15;
+        this.bounceSpring = 0.1;
+        this.bounceDamping = 0.7;
     }
 
     update() {
@@ -36,17 +43,39 @@ class MossPatch {
         if (this.opacity < 1) {
             this.opacity += this.fadeSpeed;
         }
+
+        // Small bounce effect when planted
+        if (this.bounceVelocity !== 0) {
+            this.bounceOffset += this.bounceVelocity;
+            this.bounceVelocity -= this.bounceGravity;
+            
+            if (Math.abs(this.bounceOffset) < 0.5 && Math.abs(this.bounceVelocity) < 0.2) {
+                this.bounceOffset = 0;
+                this.bounceVelocity = 0;
+            }
+        }
     }
 
     draw() {
         const color = isRainy ? COLORS.rainy.moss : COLORS.sunny.moss;
         ctx.globalAlpha = this.opacity;
         ctx.beginPath();
-        ctx.arc(this.x, this.y, this.size, 0, Math.PI * 2);
+        // Apply bounce offset to the y coordinate
+        ctx.arc(this.x, this.y + this.bounceOffset, this.size, 0, Math.PI * 2);
         ctx.fillStyle = color;
         ctx.fill();
         ctx.closePath();
         ctx.globalAlpha = 1.0;
+    }
+
+    // Method to trigger the bounce
+    bounce() {
+        this.bounceVelocity = 2 + Math.random() * 2;
+    }
+
+    // Simplified version of the bounce for the 'planting' moment
+    initBounce() {
+        this.bounceVelocity = 1.5 + Math.random() * 1.5;
     }
 }
 
@@ -80,7 +109,9 @@ function plantMoss(e) {
     const x = e.clientX - rect.left;
     const y = e.clientY - rect.top;
     
-    mossPatches.push(new MossPatch(x, y));
+    const patch = new MossPatch(x, y);
+    patch.initBounce();
+    mossPatches.push(patch);
     ripples.push(new Ripple(x, y));
 }
 
@@ -88,37 +119,49 @@ function toggleWeather(rainy) {
     isRainy = rainy;
     sunnyBtn.classList.toggle('active-weather', !rainy);
     rainyBtn.classList.toggle('active-weather', rainy);
-    statusText.innerText = rainy ? "It's raining... moss is drinking!" : "The sun is out! Plant more moss!";
+    statusText.innerText = rainy ? "It's raining... the moss looks darker." : "Click to plant moss!";
 }
 
-sunnyBtn.addEventListener('click', () => toggleWeather(false));
-rainyBtn.addEventListener('click', () => toggleWeather(true));
-
-soundToggle.addEventListener('click', () => {
-    soundEnabled = !soundEnabled;
-    soundToggle.innerText = `Sound: ${soundEnabled ? 'On' : 'Off'}`;
-});
-
-canvas.addEventListener('mousedown', plantMoss);
-
 function animate() {
-    ctx.fillStyle = isRainy ? COLORS.rainy.rock : COLORS.sunny.rock;
+    const bgColor = isRainy ? COLORS.rainy.rock : COLORS.sunny.rock;
+    ctx.fillStyle = bgColor;
     ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+    ripples.forEach((ripple, index) => {
+        ripple.update();
+        if (ripple.opacity <= 0) {
+            ripples.splice(index, 1);
+        }
+    });
 
     mossPatches.forEach(patch => {
         patch.update();
         patch.draw();
     });
 
-    ripples.forEach((ripple, index) => {
-        ripple.update();
-        ripple.draw();
-        if (ripple.opacity <= 0) {
-            ripples.splice(index, 1);
-        }    
-    });
+    if (isRainy) {
+        ctx.strokeStyle = 'rgba(255, 255, 255, 0.2)';
+        ctx.lineWidth = 1;
+        for (let i = 0; i < 5; i++) {
+            ctx.beginPath();
+            ctx.moveTo(Math.random() * canvas.width, Math.random() * canvas.height);
+            ctx.lineTo(Math.random() * canvas.width, Math.random() * canvas.height);
+            ctx.stroke();
+        }
+    }
 
     requestAnimationFrame(animate);
 }
+
+canvas.addEventListener('mousedown', plantMoss);
+
+sunnyBtn.addEventListener('click', () => toggleWeather(false));
+
+rainyBtn.addEventListener('click', () => toggleWeather(true));
+
+soundToggle.addEventListener('click', () => {
+    soundEnabled = !soundEnabled;
+    soundToggle.innerText = `Sound: ${soundEnabled ? 'On' : 'Off'}`;
+});
 
 animate();
